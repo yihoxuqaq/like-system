@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.redis.core.RedisTemplate;
+import top.yihoxu.likesystem.constant.ThumbConstant;
 import top.yihoxu.likesystem.model.entity.Blog;
 import top.yihoxu.likesystem.model.entity.Thumb;
 import top.yihoxu.likesystem.model.entity.User;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import top.yihoxu.likesystem.service.ThumbService;
 import top.yihoxu.likesystem.service.UserService;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +41,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog>
     @Lazy
     private ThumbService thumbService;
 
+    @Resource
+    private RedisTemplate redisTemplate;
+
     @Override
     public BlogVO getBlogVOById(long blogId, HttpServletRequest request) {
         Blog blog = this.getById(blogId);
@@ -51,15 +57,24 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog>
         HashMap<Long, Boolean> blogIdHasThumbMap = new HashMap<>();
         if (ObjUtil.isNotEmpty(loginUser)) {
             //获取全部blogId
-            Set<Long> blogSet = blogList.stream()
-                    .map(Blog::getId)
-                    .collect(Collectors.toSet());
+            List<String> blogId = blogList.stream()
+                    .map(i -> {
+                        return i.getId().toString();
+                    })
+                    .collect(Collectors.toList());
             //根据登录的用户查看点赞过哪些blog
-            List<Thumb> thumbList = thumbService.lambdaQuery()
+            /*List<Thumb> thumbList = thumbService.lambdaQuery()
                     .eq(Thumb::getUserId, loginUser.getId())
                     .in(Thumb::getBlogId, blogSet)
-                    .list();
-            thumbList.forEach(thumb -> blogIdHasThumbMap.put(thumb.getUserId(), true));
+                    .list();*/
+            //从redis中查询
+            List<Long> thumbId = redisTemplate.opsForHash().multiGet(ThumbConstant.USER_THUMB_KEY_PREFIX + loginUser.getId().toString(), blogId);
+            for (int i = 0; i < thumbId.size(); i++) {
+                if (thumbId.get(i) == null) {
+                    continue;
+                }
+                blogIdHasThumbMap.put(Long.valueOf(blogId.get(i)), true);
+            }
         }
         return blogList.stream()
                 .map(blog -> {

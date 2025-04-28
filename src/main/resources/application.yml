@@ -1,6 +1,13 @@
 spring:
   application:
     name: like-system
+  data:
+    # Redis 配置
+    redis:
+      database: 0
+      host: localhost
+      timeout: 5000
+      port: 6380
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
@@ -13,6 +20,7 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: false
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
 
 
 
